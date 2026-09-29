@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediCare - Real-Time Medical Checkup Booking</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX Export) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 antialiased flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Brand Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shadow-md shadow-teal-600/30">
+                        <i class="fa-solid font-bold text-xl fa-heart-pulse"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="font-bold text-slate-900 text-lg sm:text-xl leading-tight">MediCare Center</h1>
+                            <span id="liveBadge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <span class="w-1.5 h-1.5 mr-1 bg-emerald-500 rounded-full animate-pulse"></span> Live Sync
+                            </span>
+                        </div>
+                        <p class="text-xs text-teal-600 font-medium">Real-Time Medical Checkup Portal (2–10 Nov 2026)</p>
+                    </div>
+                </div>
+
+                <!-- View Switcher Tabs -->
+                <div class="flex bg-slate-100 p-1 rounded-xl text-xs sm:text-sm font-semibold">
+                    <button id="navBookingBtn" onclick="switchTab('booking')" class="flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg bg-white text-teal-700 shadow-sm transition-all duration-200">
+                        <i class="fa-regular fa-calendar-check"></i>
+                        <span>Book Slot</span>
+                    </button>
+                    <button id="navAdminBtn" onclick="switchTab('admin')" class="flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200">
+                        <i class="fa-solid fa-user-shield"></i>
+                        <span>Admin Records</span>
+                        <span id="recordBadge" class="bg-teal-100 text-teal-800 text-xs px-2 py-0.5 rounded-full font-bold ml-1">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Notification Toast -->
+        <div id="toast" class="hidden fixed bottom-5 right-5 z-50 max-w-md bg-slate-900 text-white p-4 rounded-xl shadow-2xl flex items-start space-x-3 transition-all duration-300 transform translate-y-2">
+            <div id="toastIcon" class="text-teal-400 text-xl mt-0.5"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="flex-1">
+                <h4 id="toastTitle" class="font-semibold text-sm">Success</h4>
+                <p id="toastMsg" class="text-xs text-slate-300 mt-0.5">Your action was completed.</p>
+            </div>
+            <button onclick="dismissToast()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- ================= BOOKING TAB ================= -->
+        <div id="bookingTab" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Column: Registration Form -->
+            <div class="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="border-b border-slate-100 pb-5 mb-6 flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900 flex items-center space-x-2">
+                            <i class="fa-solid fa-user-plus text-teal-600"></i>
+                            <span>Checkup Registration</span>
+                        </h2>
+                        <p class="text-sm text-slate-500 mt-1">Daily capacity limit: strictly <strong>6 persons per day</strong> (Nov 2 – Nov 10, 2026).</p>
+                    </div>
+                </div>
+
+                <form id="bookingForm" onsubmit="handleFormSubmit(event)" class="space-y-5" novalidate>
+                    
+                    <!-- Full Name -->
+                    <div>
+                        <label for="fullName" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                            Full Name <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative rounded-xl shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-regular fa-user"></i>
+                            </div>
+                            <input type="text" id="fullName" required placeholder="e.g. Ahmad Bin Ismail"
+                                class="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm transition-all outline-none">
+                        </div>
+                        <p id="fullNameError" class="hidden text-xs text-rose-500 mt-1">Please enter full name.</p>
+                    </div>
+
+                    <!-- IC Number -->
+                    <div>
+                        <label for="icNumber" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                            IC / Identification Number <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative rounded-xl shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-regular fa-id-card"></i>
+                            </div>
+                            <input type="text" id="icNumber" required placeholder="e.g. 900102-03-5678 or 900102035678"
+                                class="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm transition-all outline-none">
+                        </div>
+                        <p id="icError" class="hidden text-xs text-rose-500 mt-1">Please enter a valid 12-digit Malaysian IC format (e.g. 950812-10-5432).</p>
+                    </div>
+
+                    <!-- Contact Number -->
+                    <div>
+                        <label for="phone" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                            Phone Number <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative rounded-xl shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-phone-volume"></i>
+                            </div>
+                            <input type="tel" id="phone" required placeholder="e.g. 012-3456789"
+                                class="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm transition-all outline-none">
+                        </div>
+                        <p id="phoneError" class="hidden text-xs text-rose-500 mt-1">Valid phone number required.</p>
+                    </div>
+
+                    <!-- Appointment Date Selection -->
+                    <div>
+                        <label for="appointmentDate" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                            Select Appointment Date (Nov 2 - Nov 10) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative rounded-xl shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-regular fa-calendar-days"></i>
+                            </div>
+                            <select id="appointmentDate" required onchange="validateDateSelection()"
+                                class="block w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm appearance-none transition-all outline-none cursor-pointer">
+                                <option value="" disabled selected>Connecting real-time slots...</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                        <p id="dateError" class="hidden text-xs text-rose-500 mt-1">Please choose an available appointment date.</p>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="pt-2">
+                        <button type="submit" id="submitBtn" class="w-full bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-teal-600/20 hover:shadow-teal-600/30 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span id="submitBtnText">Confirm Booking</span>
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Right Column: Real-Time Availability Overview -->
+            <div class="lg:col-span-5 space-y-6">
+                <!-- Info Banner -->
+                <div class="bg-gradient-to-br from-teal-900 to-slate-900 text-white p-6 rounded-2xl shadow-md relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl"></div>
+                    <div class="flex items-center space-x-3 mb-3">
+                        <span class="p-2 bg-teal-500/20 text-teal-300 rounded-lg"><i class="fa-solid fa-bolt"></i></span>
+                        <h3 class="font-bold text-base">Real-Time Cloud Synchronization</h3>
+                    </div>
+                    <ul class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-circle-dot text-emerald-400 mt-1 text-[10px]"></i>
+                            <span>All devices connect live to the shared Firestore cloud database.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-circle-dot text-emerald-400 mt-1 text-[10px]"></i>
+                            <span>When any user submits a booking on any device, daily limits update automatically.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-circle-dot text-emerald-400 mt-1 text-[10px]"></i>
+                            <span>Record deletion and data clearing strictly require Admin Verification.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Daily Capacity Overview Card -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-900 text-sm uppercase tracking-wider flex items-center space-x-2">
+                            <i class="fa-solid fa-chart-pie text-teal-600"></i>
+                            <span>Live Slot Availability</span>
+                        </h3>
+                        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">Limit: 6 / day</span>
+                    </div>
+
+                    <!-- Availability Progress List -->
+                    <div id="availabilityList" class="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                        <div class="text-center py-8 text-slate-400 text-xs">
+                            <i class="fa-solid fa-arrows-rotate animate-spin text-base mb-2"></i>
+                            <p>Loading real-time availability...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= RECORDS / ADMIN TAB ================= -->
+        <div id="adminTab" class="hidden space-y-6">
+            
+            <!-- Admin Dashboard Header -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-database text-teal-600"></i>
+                        <span>Live Patient Database</span>
+                    </h2>
+                    <p class="text-sm text-slate-500 mt-0.5">Real-time records. Protected database operations require admin password authentication.</p>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="openChangePasswordModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-200 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-key text-amber-600"></i>
+                        <span>Change Password</span>
+                    </button>
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm flex items-center space-x-2 transition-all">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Export Excel (.xlsx)</span>
+                    </button>
+                    <button onclick="promptClearAllRecords()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-semibold px-3.5 py-2.5 rounded-xl transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Clear All</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metrics Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Total Registrations</p>
+                        <h4 id="statTotal" class="text-2xl font-bold text-slate-900">0</h4>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Active Booked Days</p>
+                        <h4 id="statActiveDays" class="text-2xl font-bold text-slate-900">0 / 9</h4>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-square-parking"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Global Free Slots</p>
+                        <h4 id="statRemainingSlots" class="text-2xl font-bold text-slate-900">54</h4>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                
+                <!-- Search and Filter Tools -->
+                <div class="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-72">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        </div>
+                        <input type="text" id="searchInput" oninput="filterRecords()" placeholder="Search Name, IC, Phone..."
+                            class="block w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <span class="text-xs font-medium text-slate-500 whitespace-nowrap">Filter Date:</span>
+                        <select id="dateFilter" onchange="filterRecords()" class="bg-white border border-slate-200 rounded-xl text-xs sm:text-sm px-3 py-2 outline-none focus:ring-2 focus:ring-teal-500 w-full sm:w-auto">
+                            <option value="ALL">All Dates (2 Nov - 10 Nov)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table Content -->
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/70 text-slate-600 uppercase text-[11px] tracking-wider font-semibold border-b border-slate-200">
+                                <th class="py-3.5 px-4">#</th>
+                                <th class="py-3.5 px-4">Full Name</th>
+                                <th class="py-3.5 px-4">IC Number</th>
+                                <th class="py-3.5 px-4">Phone</th>
+                                <th class="py-3.5 px-4">Appointment Date</th>
+                                <th class="py-3.5 px-4">Registered At</th>
+                                <th class="py-3.5 px-4 text-center"><i class="fa-solid fa-lock text-xs mr-1"></i>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                            <!-- JS Injected rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden py-12 text-center text-slate-400">
+                    <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                    <p class="font-medium text-slate-600">No registration records found.</p>
+                    <p class="text-xs text-slate-400 mt-1">Book an appointment to see live synchronization in action.</p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal 1: Booking Success Modal -->
+    <div id="successModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-slate-100 transform transition-all">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900">Booking Confirmed!</h3>
+            <p class="text-xs text-slate-500 mt-1">Your slot is locked and synced live across all devices.</p>
+
+            <div class="bg-slate-50 rounded-xl p-4 my-5 text-left border border-slate-200/80 text-xs space-y-2">
+                <div class="flex justify-between border-b border-slate-200 pb-2">
+                    <span class="text-slate-500">Name:</span>
+                    <span id="modalName" class="font-semibold text-slate-800"></span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200 pb-2">
+                    <span class="text-slate-500">IC Number:</span>
+                    <span id="modalIC" class="font-semibold text-slate-800"></span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200 pb-2">
+                    <span class="text-slate-500">Selected Date:</span>
+                    <span id="modalDate" class="font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Doc ID:</span>
+                    <span id="modalRef" class="font-mono text-slate-600"></span>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeModal('successModal')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition">
+                    Book Another
+                </button>
+                <button onclick="closeModal('successModal'); switchTab('admin');" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 rounded-xl shadow transition">
+                    View Records
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Admin Password Verification Modal -->
+    <div id="passwordModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-left">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h3 id="pwdModalTitle" class="text-lg font-bold text-slate-900">Admin Verification</h3>
+                    <p class="text-xs text-slate-500">Authentication required for protected operation.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 my-4">
+                <div>
+                    <label for="adminPassInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                        Admin Password <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="adminPassInput" placeholder="Enter password"
+                            class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm outline-none">
+                        <button type="button" onclick="togglePasswordVisibility('adminPassInput', 'pwdIcon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                            <i id="pwdIcon" class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                    <p id="pwdError" class="hidden text-xs text-rose-600 font-medium mt-1">Incorrect password. Access denied.</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+                <button onclick="closeModal('passwordModal')" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button onclick="executeProtectedAction()" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow transition">
+                    Verify & Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Change Password Modal -->
+    <div id="changePasswordModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-left">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Change Admin Password</h3>
+                    <p class="text-xs text-slate-500">Update administrative security key.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 my-4">
+                <div>
+                    <label for="currPass" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Current Password</label>
+                    <input type="password" id="currPass" placeholder="Enter current password" class="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label for="newPass" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">New Password</label>
+                    <input type="password" id="newPass" placeholder="Enter new password" class="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label for="confirmPass" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Confirm New Password</label>
+                    <input type="password" id="confirmPass" placeholder="Confirm new password" class="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <p id="changePassError" class="hidden text-xs text-rose-600 font-medium mt-1"></p>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+                <button onclick="closeModal('changePasswordModal')" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button onclick="saveNewPassword()" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow transition">
+                    Save Password
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Modules & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            addDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            getDocs 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global System Constants
+        const CAPACITY_PER_DAY = 6;
+        const AVAILABLE_DATES = [
+            "2026-11-02",
+            "2026-11-03",
+            "2026-11-04",
+            "2026-11-05",
+            "2026-11-06",
+            "2026-11-07",
+            "2026-11-08",
+            "2026-11-09",
+            "2026-11-10"
+        ];
+
+        // Environment Firebase Credentials
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'medicare-realtime-app';
+        
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.warn("Invalid ambient firebase config", e);
+            }
+        }
+
+        // Fallback Firebase Configuration for instant standalone execution
+        if (!firebaseConfig) {
+            firebaseConfig = {
+                apiKey: "AIzaSyDemoKeyForMedicareRealtimeSystem99",
+                authDomain: "medicare-realtime-app.firebaseapp.com",
+                projectId: "medicare-realtime-app",
+                storageBucket: "medicare-realtime-app.appspot.com",
+                messagingSenderId: "1234567890",
+                appId: "1:1234567890:web:medicarerealtime123"
+            };
+        }
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State Variables
+        let registrations = [];
+        let adminPassword = localStorage.getItem('medicare_admin_password_v3') || 'Admin123';
+        let pendingAction = null;
+        let isAuthReady = false;
+
+        // Path Rule: /artifacts/{appId}/public/data/registrations
+        const publicCollectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'registrations');
+
+        // Authenticate then setup real-time listener
+        async function initAuthAndFirestore() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                isAuthReady = true;
+                document.getElementById('liveBadge').classList.remove('hidden');
+                setupRealtimeListener();
+            } catch (err) {
+                console.error("Firebase auth initialization failed:", err);
+                showToast("Connection Error", "Falling back to local session mode.", "error");
+                renderDateDropdown();
+                renderAvailabilityList();
+                renderRecordsTable();
+            }
+        }
+
+        // Real-Time Listener across ALL devices
+        function setupRealtimeListener() {
+            if (!auth.currentUser) return;
+
+            onSnapshot(publicCollectionPath, (snapshot) => {
+                registrations = [];
+                snapshot.forEach((docSnap) => {
+                    registrations.push({
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    });
+                });
+
+                // Sort descending by registration timestamp
+                registrations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+                // Update UI in real time
+                renderDateDropdown();
+                renderAvailabilityList();
+                renderRecordsTable();
+                updateStats();
+            }, (error) => {
+                console.error("Realtime listener error:", error);
+                showToast("Sync Notice", "Listening for cloud updates...", "info");
+            });
+        }
+
+        // Format Date Helper
+        function formatDateDisplay(dateStr) {
+            if (!dateStr) return '';
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            return dateObj.toLocaleDateString('en-GB', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+
+        function getBookingCountByDate(dateStr) {
+            return registrations.filter(r => r.appointmentDate === dateStr).length;
+        }
+
+        // Render Dropdown options dynamically
+        function renderDateDropdown() {
+            const selectEl = document.getElementById('appointmentDate');
+            const currentValue = selectEl.value;
+
+            selectEl.innerHTML = '<option value="" disabled selected>-- Select an available date --</option>';
+
+            AVAILABLE_DATES.forEach(dateStr => {
+                const booked = getBookingCountByDate(dateStr);
+                const remaining = CAPACITY_PER_DAY - booked;
+                const formatted = formatDateDisplay(dateStr);
+
+                const option = document.createElement('option');
+                option.value = dateStr;
+
+                if (remaining <= 0) {
+                    option.disabled = true;
+                    option.innerText = `${formatted} — FULL (0 slots left)`;
+                    option.className = "text-rose-400 bg-slate-100 font-medium";
+                } else {
+                    option.innerText = `${formatted} (${remaining} slot${remaining > 1 ? 's' : ''} left)`;
+                }
+
+                selectEl.appendChild(option);
+            });
+
+            if (currentValue && !selectEl.querySelector(`option[value="${currentValue}"]`)?.disabled) {
+                selectEl.value = currentValue;
+            }
+        }
+
+        // Render Live Availability Progress Widgets
+        function renderAvailabilityList() {
+            const container = document.getElementById('availabilityList');
+            container.innerHTML = '';
+
+            AVAILABLE_DATES.forEach(dateStr => {
+                const booked = getBookingCountByDate(dateStr);
+                const remaining = CAPACITY_PER_DAY - booked;
+                const percentage = Math.min(100, Math.round((booked / CAPACITY_PER_DAY) * 100));
+                const isFull = remaining <= 0;
+
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-xl border ${isFull ? 'bg-rose-50/50 border-rose-200' : 'bg-slate-50 border-slate-200/80'} transition-all`;
+
+                item.innerHTML = `
+                    <div class="flex justify-between items-center text-xs mb-1.5">
+                        <span class="font-semibold ${isFull ? 'text-rose-800' : 'text-slate-800'}">${formatDateDisplay(dateStr)}</span>
+                        ${isFull 
+                            ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-rose-100 text-rose-700 uppercase">FULL</span>` 
+                            : `<span class="font-medium text-slate-600"><strong class="${remaining <= 2 ? 'text-amber-600' : 'text-teal-600'} font-bold">${remaining}</strong> / ${CAPACITY_PER_DAY} slots left</span>`
+                        }
+                    </div>
+                    <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div class="h-full ${isFull ? 'bg-rose-500' : percentage >= 80 ? 'bg-amber-500' : 'bg-teal-500'} transition-all duration-300" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+
+                container.appendChild(item);
+            });
+        }
+
+        // Render Filter Options
+        function renderFilterDropdown() {
+            const selectEl = document.getElementById('dateFilter');
+            selectEl.innerHTML = '<option value="ALL">All Dates (2 Nov - 10 Nov)</option>';
+
+            AVAILABLE_DATES.forEach(dateStr => {
+                const option = document.createElement('option');
+                option.value = dateStr;
+                option.innerText = formatDateDisplay(dateStr);
+                selectEl.appendChild(option);
+            });
+        }
+
+        // Input Validation
+        window.validateDateSelection = function() {
+            const dateEl = document.getElementById('appointmentDate');
+            const errorEl = document.getElementById('dateError');
+            
+            if (!dateEl.value) {
+                errorEl.classList.remove('hidden');
+                return false;
+            }
+
+            const booked = getBookingCountByDate(dateEl.value);
+            if (booked >= CAPACITY_PER_DAY) {
+                errorEl.innerText = "Selected date is fully booked across all devices. Please choose another.";
+                errorEl.classList.remove('hidden');
+                return false;
+            }
+
+            errorEl.classList.add('hidden');
+            return true;
+        };
+
+        function validateIC(ic) {
+            const clean = ic.replace(/[\s-]/g, '');
+            return /^\d{12}$/.test(clean);
+        }
+
+        // Form Submit -> Push to Firestore
+        window.handleFormSubmit = async function(e) {
+            e.preventDefault();
+
+            const fullName = document.getElementById('fullName').value.trim();
+            const icNumber = document.getElementById('icNumber').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const date = document.getElementById('appointmentDate').value;
+
+            let isValid = true;
+
+            if (!fullName) {
+                document.getElementById('fullNameError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('fullNameError').classList.add('hidden');
+            }
+
+            if (!validateIC(icNumber)) {
+                document.getElementById('icError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('icError').classList.add('hidden');
+            }
+
+            if (!phone || phone.length < 8) {
+                document.getElementById('phoneError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('phoneError').classList.add('hidden');
+            }
+
+            if (!date || !validateDateSelection()) {
+                isValid = false;
+            }
+
+            if (!isValid) return;
+
+            // Enforce real-time capacity before pushing
+            const currentCount = getBookingCountByDate(date);
+            if (currentCount >= CAPACITY_PER_DAY) {
+                showToast("Date Fully Booked", "Another device just booked the last slot for this date!", "error");
+                renderDateDropdown();
+                renderAvailabilityList();
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            submitBtn.disabled = true;
+            submitBtnText.innerText = "Syncing with cloud...";
+
+            const newRecord = {
+                fullName: fullName,
+                icNumber: icNumber,
+                phone: phone,
+                appointmentDate: date,
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                let docRefId = 'LOCAL-' + Math.floor(Math.random() * 10000);
+                if (auth.currentUser) {
+                    const docRef = await addDoc(publicCollectionPath, newRecord);
+                    docRefId = docRef.id;
+                } else {
+                    registrations.unshift({ id: docRefId, ...newRecord });
+                }
+
+                document.getElementById('modalName').innerText = newRecord.fullName;
+                document.getElementById('modalIC').innerText = newRecord.icNumber;
+                document.getElementById('modalDate').innerText = formatDateDisplay(newRecord.appointmentDate);
+                document.getElementById('modalRef').innerText = docRefId;
+                document.getElementById('successModal').classList.remove('hidden');
+
+                document.getElementById('bookingForm').reset();
+                showToast("Booking Synced!", "Slot successfully reserved and synchronized live.");
+            } catch (err) {
+                console.error("Firestore write error:", err);
+                showToast("Booking Error", "Unable to sync with cloud. Please try again.", "error");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtnText.innerText = "Confirm Booking";
+            }
+        };
+
+        // Render Admin Records
+        function renderRecordsTable() {
+            const tbody = document.getElementById('recordsTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const filterDate = document.getElementById('dateFilter').value;
+
+            tbody.innerHTML = '';
+
+            const filtered = registrations.filter(r => {
+                const matchesSearch = (r.fullName || '').toLowerCase().includes(searchVal) ||
+                                     (r.icNumber || '').toLowerCase().includes(searchVal) ||
+                                     (r.phone || '').toLowerCase().includes(searchVal) ||
+                                     (r.id || '').toLowerCase().includes(searchVal);
+
+                const matchesDate = (filterDate === 'ALL') || (r.appointmentDate === filterDate);
+
+                return matchesSearch && matchesDate;
+            });
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+
+                filtered.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                    const timeStr = item.createdAt ? new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
+
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-slate-400 text-xs">${index + 1}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${escapeHtml(item.fullName)}</td>
+                        <td class="py-3 px-4 font-mono text-slate-700">${escapeHtml(item.icNumber)}</td>
+                        <td class="py-3 px-4 text-slate-700">${escapeHtml(item.phone)}</td>
+                        <td class="py-3 px-4">
+                            <span class="bg-teal-50 text-teal-700 font-medium px-2.5 py-1 rounded-md border border-teal-200/60 inline-block text-xs">
+                                <i class="fa-regular fa-calendar text-[10px] mr-1"></i> ${formatDateDisplay(item.appointmentDate)}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-xs text-slate-400">${timeStr}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="promptDeleteRecord('${item.id}', '${escapeHtml(item.fullName)}')" title="Protected Delete" class="text-slate-400 hover:text-rose-600 transition p-1.5 rounded-lg hover:bg-rose-50">
+                                <i class="fa-solid fa-lock text-[10px] mr-1 text-slate-400"></i>
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        window.filterRecords = function() {
+            renderRecordsTable();
+        };
+
+        // Protected Single Delete
+        window.promptDeleteRecord = function(id, name) {
+            document.getElementById('pwdModalTitle').innerText = `Delete Record: ${name}`;
+            document.getElementById('pwdError').classList.add('hidden');
+            document.getElementById('adminPassInput').value = '';
+
+            pendingAction = async () => {
+                try {
+                    if (auth.currentUser && !id.startsWith('LOCAL-')) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'registrations', id));
+                    } else {
+                        registrations = registrations.filter(r => r.id !== id);
+                        renderDateDropdown();
+                        renderAvailabilityList();
+                        renderRecordsTable();
+                    }
+                    showToast("Record Deleted", `Record for ${name} removed from live database.`, "info");
+                } catch (err) {
+                    console.error("Deletion failed:", err);
+                    showToast("Deletion Failed", "Unable to remove record from cloud.", "error");
+                }
+            };
+
+            document.getElementById('passwordModal').classList.remove('hidden');
+        };
+
+        // Protected Clear All
+        window.promptClearAllRecords = function() {
+            if (registrations.length === 0) {
+                showToast("Action Aborted", "Database is already empty.", "info");
+                return;
+            }
+
+            document.getElementById('pwdModalTitle').innerText = "Clear ALL Patient Records";
+            document.getElementById('pwdError').classList.add('hidden');
+            document.getElementById('adminPassInput').value = '';
+
+            pendingAction = async () => {
+                try {
+                    if (auth.currentUser) {
+                        const snapshot = await getDocs(publicCollectionPath);
+                        const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'registrations', d.id)));
+                        await Promise.all(deletePromises);
+                    } else {
+                        registrations = [];
+                        renderDateDropdown();
+                        renderAvailabilityList();
+                        renderRecordsTable();
+                    }
+                    showToast("Database Cleared", "All patient records cleared live across all devices.", "info");
+                } catch (err) {
+                    console.error("Clear all failed:", err);
+                    showToast("Error", "Could not clear all records.", "error");
+                }
+            };
+
+            document.getElementById('passwordModal').classList.remove('hidden');
+        };
+
+        // Execute Auth Protected Action
+        window.executeProtectedAction = function() {
+            const inputPwd = document.getElementById('adminPassInput').value;
+            const errorEl = document.getElementById('pwdError');
+
+            if (inputPwd === adminPassword) {
+                closeModal('passwordModal');
+                if (typeof pendingAction === 'function') {
+                    pendingAction();
+                    pendingAction = null;
+                }
+            } else {
+                errorEl.innerText = "Incorrect password! Access denied.";
+                errorEl.classList.remove('hidden');
+                showToast("Access Denied", "Incorrect admin password entered.", "error");
+            }
+        };
+
+        // Password Change Management
+        window.openChangePasswordModal = function() {
+            document.getElementById('currPass').value = '';
+            document.getElementById('newPass').value = '';
+            document.getElementById('confirmPass').value = '';
+            document.getElementById('changePassError').classList.add('hidden');
+            document.getElementById('changePasswordModal').classList.remove('hidden');
+        };
+
+        window.saveNewPassword = function() {
+            const curr = document.getElementById('currPass').value;
+            const newP = document.getElementById('newPass').value;
+            const confP = document.getElementById('confirmPass').value;
+            const errorEl = document.getElementById('changePassError');
+
+            if (curr !== adminPassword) {
+                errorEl.innerText = "Current password is incorrect.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (!newP || newP.length < 4) {
+                errorEl.innerText = "New password must be at least 4 characters long.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (newP !== confP) {
+                errorEl.innerText = "New passwords do not match.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            adminPassword = newP;
+            localStorage.setItem('medicare_admin_password_v3', adminPassword);
+            closeModal('changePasswordModal');
+            showToast("Password Updated", "Admin password updated successfully.", "success");
+        };
+
+        // Export to Excel (.xlsx) via SheetJS
+        window.exportToExcel = function() {
+            if (registrations.length === 0) {
+                showToast("Export Failed", "There are no registration records to export.", "error");
+                return;
+            }
+
+            const dataToExport = registrations.map((r, index) => ({
+                "No": index + 1,
+                "Doc ID": r.id,
+                "Full Name": r.fullName,
+                "IC / Passport Number": r.icNumber,
+                "Contact Number": r.phone,
+                "Appointment Date": formatDateDisplay(r.appointmentDate),
+                "ISO Date": r.appointmentDate,
+                "Registered Timestamp": r.createdAt
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+            worksheet['!cols'] = [
+                { wch: 5 },
+                { wch: 22 },
+                { wch: 26 },
+                { wch: 20 },
+                { wch: 16 },
+                { wch: 22 },
+                { wch: 14 },
+                { wch: 24 }
+            ];
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Live Checkup Bookings");
+
+            const fileName = `Medical_Checkup_Bookings_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+
+            showToast("Export Complete", `Exported ${registrations.length} live record(s) to ${fileName}`);
+        };
+
+        // Stats Updates
+        function updateStats() {
+            document.getElementById('statTotal').innerText = registrations.length;
+
+            const datesWithBookings = new Set(registrations.map(r => r.appointmentDate)).size;
+            document.getElementById('statActiveDays').innerText = `${datesWithBookings} / ${AVAILABLE_DATES.length}`;
+
+            const totalCapacity = AVAILABLE_DATES.length * CAPACITY_PER_DAY;
+            const remaining = totalCapacity - registrations.length;
+            document.getElementById('statRemainingSlots').innerText = Math.max(0, remaining);
+            document.getElementById('recordBadge').innerText = registrations.length;
+        }
+
+        // Tab Navigation
+        window.switchTab = function(tab) {
+            const bookingTab = document.getElementById('bookingTab');
+            const adminTab = document.getElementById('adminTab');
+            const navBookingBtn = document.getElementById('navBookingBtn');
+            const navAdminBtn = document.getElementById('navAdminBtn');
+
+            if (tab === 'booking') {
+                bookingTab.classList.remove('hidden');
+                adminTab.classList.add('hidden');
+
+                navBookingBtn.className = "flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg bg-white text-teal-700 shadow-sm transition-all duration-200";
+                navAdminBtn.className = "flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200";
+            } else {
+                bookingTab.classList.add('hidden');
+                adminTab.classList.remove('hidden');
+
+                navAdminBtn.className = "flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg bg-white text-teal-700 shadow-sm transition-all duration-200";
+                navBookingBtn.className = "flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200";
+            }
+        };
+
+        // Toast Helper
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastTitle.innerText = title;
+            toastMsg.innerText = message;
+
+            if (type === 'error') {
+                toastIcon.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-400"></i>`;
+            } else if (type === 'info') {
+                toastIcon.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400"></i>`;
+            } else {
+                toastIcon.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i>`;
+            }
+
+            toast.classList.remove('hidden', 'translate-y-2');
+            
+            setTimeout(() => {
+                dismissToast();
+            }, 4000);
+        }
+
+        window.dismissToast = function() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('translate-y-2');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
+        };
+
+        window.closeModal = function(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        };
+
+        window.togglePasswordVisibility = function(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-regular fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-regular fa-eye';
+            }
+        };
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderFilterDropdown();
+            initAuthAndFirestore();
+        });
+    </script>
+</body>
+</html>
